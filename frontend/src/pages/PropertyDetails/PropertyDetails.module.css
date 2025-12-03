@@ -1,0 +1,295 @@
+.propertyDetails {
+  min-height: calc(100vh - 64px);
+  background-color: var(--gray-50);
+  padding: var(--spacing-xl) 0;
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 var(--spacing-md);
+}
+
+.loadingContainer,
+.errorContainer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 60vh;
+}
+
+/* Gallery */
+.gallery {
+  background-color: var(--white);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-lg);
+  margin-bottom: var(--spacing-xl);
+}
+
+.mainImage {
+  width: 100%;
+  height: 500px;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  margin-bottom: var(--spacing-md);
+}
+
+.mainImage img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.thumbnails {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: var(--spacing-md);
+}
+
+.thumbnails img {
+  width: 100%;
+  height: 100px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  opacity: 0.7;
+  transition: opacity var(--transition-fast);
+  border: 3px solid transparent;
+}
+
+.thumbnails img:hover,
+.thumbnails img.active {
+  opacity: 1;
+  border-color: var(--primary);
+}
+
+.noImage {
+  width: 100%;
+  height: 400px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--gray-100);
+  border-radius: var(--radius-md);
+  color: var(--gray-500);
+  font-size: 1.25rem;
+}
+
+/* Content */
+.content {
+  display: grid;
+  grid-template-columns: 1fr 350px;
+  gap: var(--spacing-xl);
+}
+
+.mainInfo {
+  background-color: var(--white);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-xl);
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: var(--spacing-lg);
+}
+
+.badge {
+  display: inline-block;
+  padding: 0.375rem 0.75rem;
+  background-color: var(--primary);
+  color: var(--white);
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  border-radius: var(--radius-full);
+  margin-bottom: var(--spacing-sm);
+}
+
+.title {
+  font-size: 2rem;
+  font-weight: 800;
+  margin-bottom: var(--spacing-sm);
+}
+
+.location {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--gray-600);
+}
+
+.bookmarkButton {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background-color: var(--gray-100);
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  color: var(--gray-600);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.bookmarkButton:hover {
+  background-color: var(--gray-200);
+  color: var(--error);
+}
+
+.bookmarkButton .bookmarked {
+  fill: var(--error);
+  color: var(--error);
+}
+
+.price {
+  font-size: 2.5rem;
+  font-weight: 800;
+  color: var(--primary);
+  margin-bottom: var(--spacing-lg);
+}
+
+.price span {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--gray-600);
+}
+
+.features {
+  display: flex;
+  gap: var(--spacing-xl);
+  padding: var(--spacing-lg) 0;
+  border-top: 1px solid var(--gray-200);
+  border-bottom: 1px solid var(--gray-200);
+  margin-bottom: var(--spacing-xl);
+}
+
+.feature {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1rem;
+  color: var(--gray-700);
+}
+
+.feature svg {
+  font-size: 1.5rem;
+  color: var(--primary);
+}
+
+.description h3,
+.amenities h3 {
+  font-size: 1.5rem;
+  margin-bottom: var(--spacing-md);
+}
+
+.description p {
+  color: var(--gray-700);
+  line-height: 1.8;
+  white-space: pre-wrap;
+}
+
+.amenitiesList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+}
+
+.amenity {
+  padding: 0.5rem 1rem;
+  background-color: var(--gray-100);
+  border-radius: var(--radius-full);
+  font-size: 0.875rem;
+  color: var(--gray-700);
+}
+
+/* Owner Card */
+.ownerCard {
+  background-color: var(--white);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-xl);
+  height: fit-content;
+  position: sticky;
+  top: 80px;
+}
+
+.ownerCard h3 {
+  font-size: 1.25rem;
+  margin-bottom: var(--spacing-lg);
+}
+
+.ownerInfo {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-lg);
+}
+
+.ownerAvatar {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.ownerAvatarPlaceholder {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background-color: var(--primary);
+  color: var(--white);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.ownerInfo h4 {
+  font-size: 1.125rem;
+  margin-bottom: 0.25rem;
+}
+
+.ownerInfo p {
+  color: var(--gray-600);
+  font-size: 0.875rem;
+}
+
+.phone {
+  text-align: center;
+  margin-top: var(--spacing-md);
+  color: var(--gray-600);
+  font-size: 0.875rem;
+}
+
+@media (max-width: 992px) {
+  .content {
+    grid-template-columns: 1fr;
+  }
+
+  .ownerCard {
+    position: static;
+  }
+}
+
+@media (max-width: 768px) {
+  .mainImage {
+    height: 300px;
+  }
+
+  .title {
+    font-size: 1.5rem;
+  }
+
+  .price {
+    font-size: 2rem;
+  }
+
+  .features {
+    flex-direction: column;
+    gap: var(--spacing-md);
+  }
+}

@@ -1,0 +1,69 @@
+.bookmarksPage {
+  min-height: calc(100vh - 64px);
+  background-color: var(--gray-50);
+  padding: var(--spacing-xl) 0;
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 var(--spacing-md);
+}
+
+.title {
+  font-size: 2rem;
+  font-weight: 800;
+  color: var(--gray-900);
+  margin-bottom: var(--spacing-xl);
+}
+
+.loadingContainer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 400px;
+}
+
+.propertiesGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: var(--spacing-xl);
+}
+
+.emptyState {
+  text-align: center;
+  padding: 4rem 2rem;
+  background-color: var(--white);
+  border-radius: var(--radius-lg);
+}
+
+.emptyState h2 {
+  font-size: 1.5rem;
+  margin-bottom: var(--spacing-md);
+}
+
+.emptyState p {
+  color: var(--gray-600);
+  margin-bottom: var(--spacing-xl);
+}
+
+.browseButton {
+  padding: 0.75rem 2rem;
+  background-color: var(--primary);
+  color: var(--white);
+  border: none;
+  border-radius: var(--radius-full);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+
+.browseButton:hover {
+  background-color: var(--primary-light);
+}
+
+@media (max-width: 768px) {
+  .propertiesGrid {
+    grid-template-columns: 1fr;
+  }
+}
