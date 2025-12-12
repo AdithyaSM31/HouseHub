@@ -316,7 +316,32 @@ VITE_API_URL=http://localhost:5000/api
 
 ---
 
-## 🚧 Future Enhancements
+## � Deployment
+
+See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed deployment instructions.
+
+**Quick Links:**
+- **Frontend (Vercel)**: Deploy to Vercel using the included `vercel.json`
+- **Backend (Render)**: Deploy to Render using the included `render.yaml`
+
+### Production Environment Variables
+
+**Frontend (.env.production)**
+```
+VITE_API_URL=https://your-backend-url.onrender.com/api
+```
+
+**Backend (Render Environment)**
+```
+NODE_ENV=production
+JWT_SECRET=your-production-secret-key
+ALLOWED_ORIGINS=https://your-frontend-url.vercel.app
+PORT=10000
+```
+
+---
+
+## �🚧 Future Enhancements
 
 - [ ] Image upload to cloud storage (Cloudinary/AWS S3)
 - [ ] Email notifications
