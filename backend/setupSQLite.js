@@ -3,7 +3,7 @@
  * Creates tables and populates with sample data
  */
 
-const { db } = require('./config/database_sqlite');
+const { db } = require('./config/database');
 const bcrypt = require('bcryptjs');
 
 console.log('🔧 Setting up SQLite database...\n');
