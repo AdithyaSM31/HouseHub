@@ -8,7 +8,6 @@ const router = express.Router();
 const { body } = require('express-validator');
 const { validate } = require('../middleware/validate');
 const { authenticateUser, optionalAuth } = require('../middleware/auth');
-const upload = require('../middleware/upload');
 const {
   createProperty,
   getAllProperties,
