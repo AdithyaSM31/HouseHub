@@ -8,6 +8,18 @@ const bcrypt = require('bcryptjs');
 
 console.log('🔧 Setting up SQLite database...\n');
 
+// Drop existing tables to ensure clean setup
+db.exec(`
+  DROP TABLE IF EXISTS messages;
+  DROP TABLE IF EXISTS conversations;
+  DROP TABLE IF EXISTS bookmarks;
+  DROP TABLE IF EXISTS property_images;
+  DROP TABLE IF EXISTS properties;
+  DROP TABLE IF EXISTS users;
+`);
+
+console.log('🗑️  Dropped existing tables');
+
 // Create tables
 db.exec(`
   -- Users table
