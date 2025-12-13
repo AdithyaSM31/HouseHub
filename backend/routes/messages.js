@@ -10,7 +10,7 @@ const { validate } = require('../middleware/validate');
 const { authenticateUser } = require('../middleware/auth');
 const {
   sendMessage,
-  getConversation,
+  getConversationMessages,
   getConversations,
   getUnreadCount
 } = require('../controllers/messageController');
@@ -22,7 +22,7 @@ router.get('/conversations', authenticateUser, getConversations);
 router.get('/unread', authenticateUser, getUnreadCount);
 
 // Get conversation with specific user (protected)
-router.get('/conversation/:userId', authenticateUser, getConversation);
+router.get('/conversation/:userId', authenticateUser, getConversationMessages);
 
 // Send message (protected)
 router.post(
