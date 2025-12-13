@@ -14,15 +14,15 @@ exports.sendMessage = (req, res) => {
     const { receiverId, propertyId, content, message } = req.body;
     const messageContent = content || message; // Accept both field names
 
-    // Check or create conversation
+    // Check or create conversation - find by users, not property
     let conversation = db.prepare(`
       SELECT id FROM conversations 
-      WHERE property_id = ? AND ((user1_id = ? AND user2_id = ?) OR (user1_id = ? AND user2_id = ?))
-    `).get(propertyId, senderId, receiverId, receiverId, senderId);
+      WHERE (user1_id = ? AND user2_id = ?) OR (user1_id = ? AND user2_id = ?)
+    `).get(senderId, receiverId, receiverId, senderId);
 
     if (!conversation) {
       const stmt = db.prepare('INSERT INTO conversations (property_id, user1_id, user2_id) VALUES (?, ?, ?)');
-      const result = stmt.run(propertyId, senderId, receiverId);
+      const result = stmt.run(propertyId || null, senderId, receiverId);
       conversation = { id: result.lastInsertRowid };
     }
 
