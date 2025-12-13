@@ -13,22 +13,34 @@ exports.sendMessage = (req, res) => {
     const senderId = req.user.userId;
     const { receiverId, propertyId, content, message } = req.body;
     const messageContent = content || message; // Accept both field names
+    
+    // Parse receiverId to integer
+    const receiverIdInt = parseInt(receiverId);
+    const propertyIdInt = propertyId ? parseInt(propertyId) : null;
+
+    if (!messageContent || !messageContent.trim()) {
+      return res.status(400).json({ error: 'Message content is required' });
+    }
+
+    if (!receiverIdInt || isNaN(receiverIdInt)) {
+      return res.status(400).json({ error: 'Valid receiver ID is required' });
+    }
 
     // Check or create conversation - find by users, not property
     let conversation = db.prepare(`
       SELECT id FROM conversations 
       WHERE (user1_id = ? AND user2_id = ?) OR (user1_id = ? AND user2_id = ?)
-    `).get(senderId, receiverId, receiverId, senderId);
+    `).get(senderId, receiverIdInt, receiverIdInt, senderId);
 
     if (!conversation) {
       const stmt = db.prepare('INSERT INTO conversations (property_id, user1_id, user2_id) VALUES (?, ?, ?)');
-      const result = stmt.run(propertyId || null, senderId, receiverId);
+      const result = stmt.run(propertyIdInt, senderId, receiverIdInt);
       conversation = { id: result.lastInsertRowid };
     }
 
     // Insert message
     const stmt = db.prepare('INSERT INTO messages (conversation_id, sender_id, receiver_id, message) VALUES (?, ?, ?, ?)');
-    stmt.run(conversation.id, senderId, receiverId, messageContent);
+    stmt.run(conversation.id, senderId, receiverIdInt, messageContent);
 
     // Update conversation timestamp
     db.prepare('UPDATE conversations SET last_message_at = CURRENT_TIMESTAMP WHERE id = ?').run(conversation.id);
@@ -39,7 +51,8 @@ exports.sendMessage = (req, res) => {
     });
   } catch (error) {
     console.error('Send message error:', error);
-    res.status(500).json({ error: 'Failed to send message' });
+    console.error('Error details:', error.message);
+    res.status(500).json({ error: 'Failed to send message', details: error.message });
   }
 };
 
