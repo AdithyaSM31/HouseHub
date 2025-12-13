@@ -114,7 +114,7 @@ const EditProperty = () => {
               style={{ width: '100%', padding: '0.75rem', border: '2px solid #d1d5db', borderRadius: '8px' }}>
               <option value="">Select Type</option>
               <option value="rent">For Rent</option>
-              <option value="sale">For Sale</option>
+              <option value="pg">PG/Hostel</option>
             </select>
           </div>
         </div>

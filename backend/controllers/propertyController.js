@@ -144,10 +144,27 @@ exports.createProperty = async (req, res) => {
       propertyData.amenities = JSON.stringify(propertyData.amenities);
     }
 
-    const property = await Property.create({
+    // Transform camelCase to snake_case for MongoDB
+    const transformedData = {
       user_id: userId,
-      ...propertyData
-    });
+      title: propertyData.title,
+      description: propertyData.description,
+      property_type: propertyData.propertyType || propertyData.property_type,
+      listing_type: propertyData.listingType || propertyData.listing_type,
+      price: propertyData.price,
+      address: propertyData.address,
+      city: propertyData.city,
+      state: propertyData.state,
+      pincode: propertyData.pincode,
+      bedrooms: propertyData.bedrooms,
+      bathrooms: propertyData.bathrooms,
+      area_sqft: propertyData.areaSqft || propertyData.area_sqft,
+      furnishing_status: propertyData.furnishingStatus || propertyData.furnishing_status,
+      amenities: propertyData.amenities,
+      images: propertyData.images || []
+    };
+
+    const property = await Property.create(transformedData);
 
     const populatedProperty = await Property.findById(property._id)
       .populate('user_id', 'display_name phone_number email')
@@ -193,9 +210,29 @@ exports.updateProperty = async (req, res) => {
       req.body.amenities = JSON.stringify(req.body.amenities);
     }
 
+    // Transform camelCase to snake_case for MongoDB
+    const transformedData = {
+      title: req.body.title,
+      description: req.body.description,
+      property_type: req.body.propertyType || req.body.property_type,
+      listing_type: req.body.listingType || req.body.listing_type,
+      price: req.body.price,
+      address: req.body.address,
+      city: req.body.city,
+      state: req.body.state,
+      pincode: req.body.pincode,
+      bedrooms: req.body.bedrooms,
+      bathrooms: req.body.bathrooms,
+      area_sqft: req.body.areaSqft || req.body.area_sqft,
+      furnishing_status: req.body.furnishingStatus || req.body.furnishing_status,
+      amenities: req.body.amenities,
+      images: req.body.images,
+      updated_at: Date.now()
+    };
+
     const updatedProperty = await Property.findByIdAndUpdate(
       propertyId,
-      { ...req.body, updated_at: Date.now() },
+      transformedData,
       { new: true }
     ).populate('user_id', 'display_name phone_number email').lean();
 
