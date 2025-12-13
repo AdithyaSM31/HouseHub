@@ -30,9 +30,9 @@ router.post(
   '/',
   [
     authenticateUser,
-    body('receiverId').isInt().withMessage('Valid receiver ID is required'),
+    body('receiverId').notEmpty().withMessage('Receiver ID is required'),
     body('content').notEmpty().withMessage('Message cannot be empty'),
-    body('propertyId').optional().isInt().withMessage('Property ID must be a number'),
+    body('propertyId').optional(),
     validate
   ],
   sendMessage
