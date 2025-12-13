@@ -12,6 +12,17 @@ exports.sendMessage = (req, res) => {
   try {
     const senderId = req.user.userId;
     const { receiverId, propertyId, content, message } = req.body;
+    
+    console.log('📨 Send message request:', {
+      senderId,
+      receiverId,
+      receiverIdType: typeof receiverId,
+      content,
+      message,
+      propertyId,
+      body: req.body
+    });
+    
     const messageContent = content || message; // Accept both field names
     
     // Parse receiverId to integer
@@ -19,12 +30,16 @@ exports.sendMessage = (req, res) => {
     const propertyIdInt = propertyId ? parseInt(propertyId) : null;
 
     if (!messageContent || !messageContent.trim()) {
+      console.log('❌ Validation failed: Empty message content');
       return res.status(400).json({ error: 'Message content is required' });
     }
 
     if (!receiverIdInt || isNaN(receiverIdInt)) {
+      console.log('❌ Validation failed: Invalid receiver ID:', receiverId);
       return res.status(400).json({ error: 'Valid receiver ID is required' });
     }
+    
+    console.log('✅ Validation passed. Looking for conversation...');
 
     // Check or create conversation - find by users, not property
     let conversation = db.prepare(`
@@ -32,18 +47,27 @@ exports.sendMessage = (req, res) => {
       WHERE (user1_id = ? AND user2_id = ?) OR (user1_id = ? AND user2_id = ?)
     `).get(senderId, receiverIdInt, receiverIdInt, senderId);
 
+    console.log('🔍 Conversation lookup result:', conversation);
+
     if (!conversation) {
+      console.log('📝 Creating new conversation...');
       const stmt = db.prepare('INSERT INTO conversations (property_id, user1_id, user2_id) VALUES (?, ?, ?)');
       const result = stmt.run(propertyIdInt, senderId, receiverIdInt);
       conversation = { id: result.lastInsertRowid };
+      console.log('✅ New conversation created with ID:', conversation.id);
+    } else {
+      console.log('✅ Found existing conversation with ID:', conversation.id);
     }
 
     // Insert message
+    console.log('💬 Inserting message into database...');
     const stmt = db.prepare('INSERT INTO messages (conversation_id, sender_id, receiver_id, message) VALUES (?, ?, ?, ?)');
-    stmt.run(conversation.id, senderId, receiverIdInt, messageContent);
+    const result = stmt.run(conversation.id, senderId, receiverIdInt, messageContent);
+    console.log('✅ Message inserted with ID:', result.lastInsertRowid);
 
     // Update conversation timestamp
     db.prepare('UPDATE conversations SET last_message_at = CURRENT_TIMESTAMP WHERE id = ?').run(conversation.id);
+    console.log('✅ Conversation timestamp updated');
 
     res.status(201).json({
       success: true,
