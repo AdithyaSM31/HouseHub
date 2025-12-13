@@ -41,33 +41,50 @@ exports.sendMessage = (req, res) => {
     
     console.log('✅ Validation passed. Looking for conversation...');
 
-    // Check or create conversation - find by users, not property
-    let conversation = db.prepare(`
-      SELECT id FROM conversations 
-      WHERE (user1_id = ? AND user2_id = ?) OR (user1_id = ? AND user2_id = ?)
-    `).get(senderId, receiverIdInt, receiverIdInt, senderId);
-
-    console.log('🔍 Conversation lookup result:', conversation);
-
-    if (!conversation) {
-      console.log('📝 Creating new conversation...');
-      const stmt = db.prepare('INSERT INTO conversations (property_id, user1_id, user2_id) VALUES (?, ?, ?)');
-      const result = stmt.run(propertyIdInt, senderId, receiverIdInt);
-      conversation = { id: result.lastInsertRowid };
-      console.log('✅ New conversation created with ID:', conversation.id);
-    } else {
-      console.log('✅ Found existing conversation with ID:', conversation.id);
+    // Verify database is available
+    if (!db) {
+      console.error('❌ Database connection is null or undefined');
+      return res.status(500).json({ error: 'Database connection error' });
     }
 
-    // Insert message
-    console.log('💬 Inserting message into database...');
-    const stmt = db.prepare('INSERT INTO messages (conversation_id, sender_id, receiver_id, message) VALUES (?, ?, ?, ?)');
-    const result = stmt.run(conversation.id, senderId, receiverIdInt, messageContent);
-    console.log('✅ Message inserted with ID:', result.lastInsertRowid);
+    // Check or create conversation - find by users, not property
+    let conversation;
+    try {
+      conversation = db.prepare(`
+        SELECT id FROM conversations 
+        WHERE (user1_id = ? AND user2_id = ?) OR (user1_id = ? AND user2_id = ?)
+      `).get(senderId, receiverIdInt, receiverIdInt, senderId);
 
-    // Update conversation timestamp
-    db.prepare('UPDATE conversations SET last_message_at = CURRENT_TIMESTAMP WHERE id = ?').run(conversation.id);
-    console.log('✅ Conversation timestamp updated');
+      console.log('🔍 Conversation lookup result:', conversation);
+    } catch (dbError) {
+      console.error('❌ Database error finding conversation:', dbError.message);
+      return res.status(500).json({ error: 'Database error', details: dbError.message });
+    }
+
+    try {
+      if (!conversation) {
+        console.log('📝 Creating new conversation...');
+        const stmt = db.prepare('INSERT INTO conversations (property_id, user1_id, user2_id) VALUES (?, ?, ?)');
+        const result = stmt.run(propertyIdInt, senderId, receiverIdInt);
+        conversation = { id: result.lastInsertRowid };
+        console.log('✅ New conversation created with ID:', conversation.id);
+      } else {
+        console.log('✅ Found existing conversation with ID:', conversation.id);
+      }
+
+      // Insert message
+      console.log('💬 Inserting message into database...');
+      const stmt = db.prepare('INSERT INTO messages (conversation_id, sender_id, receiver_id, message) VALUES (?, ?, ?, ?)');
+      const result = stmt.run(conversation.id, senderId, receiverIdInt, messageContent);
+      console.log('✅ Message inserted with ID:', result.lastInsertRowid);
+
+      // Update conversation timestamp
+      db.prepare('UPDATE conversations SET last_message_at = CURRENT_TIMESTAMP WHERE id = ?').run(conversation.id);
+      console.log('✅ Conversation timestamp updated');
+    } catch (dbError) {
+      console.error('❌ Database error inserting message:', dbError.message);
+      return res.status(500).json({ error: 'Database error', details: dbError.message });
+    }
 
     res.status(201).json({
       success: true,
