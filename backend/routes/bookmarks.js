@@ -8,12 +8,12 @@ const router = express.Router();
 const { authenticateUser } = require('../middleware/auth');
 const {
   toggleBookmark,
-  getBookmarks,
+  getUserBookmarks,
   checkBookmark
 } = require('../controllers/bookmarkController');
 
 // Get user's bookmarked properties (protected)
-router.get('/', authenticateUser, getBookmarks);
+router.get('/', authenticateUser, getUserBookmarks);
 
 // Toggle bookmark on a property (protected)
 router.post('/:propertyId', authenticateUser, toggleBookmark);
