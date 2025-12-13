@@ -3,7 +3,7 @@ services:
     name: househub-backend
     runtime: node
     env: node
-    buildCommand: npm install
+    buildCommand: npm install && node setupSQLite.js
     startCommand: npm start
     envVars:
       - key: NODE_ENV
