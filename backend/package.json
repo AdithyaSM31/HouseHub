@@ -4,7 +4,7 @@
   "description": "HouseHub Backend API - Rental and PG Listing Platform",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
+    "start": "node setupSQLite.js && node server.js",
     "dev": "nodemon server.js",
     "setup": "node setupSQLite.js",
     "seed": "node scripts/seedMongoDB.js"
