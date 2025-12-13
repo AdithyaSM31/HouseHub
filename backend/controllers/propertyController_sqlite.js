@@ -89,7 +89,7 @@ exports.getAllProperties = (req, res) => {
 };
 
 /**
- * Get featured properties
+ * Get featured properties (latest properties)
  * GET /api/properties/featured
  */
 exports.getFeaturedProperties = (req, res) => {
@@ -102,7 +102,7 @@ exports.getFeaturedProperties = (req, res) => {
       FROM properties p
       LEFT JOIN property_images pi ON p.id = pi.property_id
       LEFT JOIN users u ON p.user_id = u.id
-      WHERE p.is_active = 1 AND p.is_featured = 1
+      WHERE p.is_active = 1
       GROUP BY p.id
       ORDER BY p.created_at DESC
       LIMIT 6

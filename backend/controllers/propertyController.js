@@ -60,12 +60,12 @@ exports.getAllProperties = async (req, res) => {
 };
 
 /**
- * Get featured properties
+ * Get featured properties (latest properties)
  * GET /api/properties/featured
  */
 exports.getFeaturedProperties = async (req, res) => {
   try {
-    const properties = await Property.find({ is_active: true, is_featured: true })
+    const properties = await Property.find({ is_active: true })
       .populate('user_id', 'display_name phone_number email')
       .sort({ created_at: -1 })
       .limit(6)

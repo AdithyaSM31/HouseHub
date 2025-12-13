@@ -11,7 +11,8 @@ const { db } = require('../config/database');
 exports.sendMessage = (req, res) => {
   try {
     const senderId = req.user.userId;
-    const { receiverId, propertyId, message } = req.body;
+    const { receiverId, propertyId, content, message } = req.body;
+    const messageContent = content || message; // Accept both field names
 
     // Check or create conversation
     let conversation = db.prepare(`
@@ -27,7 +28,7 @@ exports.sendMessage = (req, res) => {
 
     // Insert message
     const stmt = db.prepare('INSERT INTO messages (conversation_id, sender_id, receiver_id, message) VALUES (?, ?, ?, ?)');
-    stmt.run(conversation.id, senderId, receiverId, message);
+    stmt.run(conversation.id, senderId, receiverId, messageContent);
 
     // Update conversation timestamp
     db.prepare('UPDATE conversations SET last_message_at = CURRENT_TIMESTAMP WHERE id = ?').run(conversation.id);

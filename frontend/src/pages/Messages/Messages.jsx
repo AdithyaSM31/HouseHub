@@ -47,7 +47,7 @@ const Messages = () => {
 
       // Fetch property details to get owner info
       if (propertyId) {
-        const response = await fetch(`http://localhost:5000/api/properties/${propertyId}`);
+        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/properties/${propertyId}`);
         const data = await response.json();
         
         if (data.success && data.property) {
@@ -90,7 +90,7 @@ const Messages = () => {
     try {
       await messageService.sendMessage({
         receiverId: selectedConversation.other_user_id,
-        message: newMessage,
+        content: newMessage,
         propertyId: selectedConversation.property_id
       });
       
