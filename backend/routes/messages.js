@@ -8,12 +8,13 @@ const router = express.Router();
 const { body } = require('express-validator');
 const { validate } = require('../middleware/validate');
 const { authenticateUser } = require('../middleware/auth');
+const { messageController } = require('../controllers');
 const {
   sendMessage,
   getConversationMessages,
   getConversations,
   getUnreadCount
-} = require('../controllers/messageController');
+} = messageController;
 
 // Get all conversations (protected)
 router.get('/conversations', authenticateUser, getConversations);

@@ -9,8 +9,15 @@ const http = require('http');
 const socketIO = require('socket.io');
 require('dotenv').config();
 
-// Import configurations
-const { connectDB, testConnection } = require('./config/database_mongodb');
+// Import configurations - Use MongoDB if URI provided, else fallback to SQLite
+const useMongoDB = !!process.env.MONGODB_URI;
+const dbConfig = useMongoDB 
+  ? require('./config/database_mongodb')
+  : require('./config/database');
+
+const { connectDB, testConnection } = useMongoDB 
+  ? dbConfig 
+  : { connectDB: async () => {}, testConnection: dbConfig.testConnection };
 
 // Import middleware
 const errorHandler = require('./middleware/errorHandler');

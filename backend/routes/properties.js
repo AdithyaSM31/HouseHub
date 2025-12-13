@@ -8,6 +8,7 @@ const router = express.Router();
 const { body } = require('express-validator');
 const { validate } = require('../middleware/validate');
 const { authenticateUser, optionalAuth } = require('../middleware/auth');
+const { propertyController } = require('../controllers');
 const {
   createProperty,
   getAllProperties,
@@ -16,7 +17,7 @@ const {
   updateProperty,
   deleteProperty,
   getUserProperties
-} = require('../controllers/propertyController');
+} = propertyController;
 
 // Get featured properties (public)
 router.get('/featured', getFeaturedProperties);

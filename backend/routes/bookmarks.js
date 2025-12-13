@@ -6,11 +6,12 @@
 const express = require('express');
 const router = express.Router();
 const { authenticateUser } = require('../middleware/auth');
+const { bookmarkController } = require('../controllers');
 const {
   toggleBookmark,
   getUserBookmarks,
   checkBookmark
-} = require('../controllers/bookmarkController');
+} = bookmarkController;
 
 // Get user's bookmarked properties (protected)
 router.get('/', authenticateUser, getUserBookmarks);

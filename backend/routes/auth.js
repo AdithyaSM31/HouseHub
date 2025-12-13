@@ -8,12 +8,13 @@ const router = express.Router();
 const { body } = require('express-validator');
 const { validate } = require('../middleware/validate');
 const { authenticateUser } = require('../middleware/auth');
+const { authController } = require('../controllers');
 const {
   register,
   login,
   getProfile,
   updateProfile
-} = require('../controllers/authController');
+} = authController;
 
 // Register new user
 router.post(
