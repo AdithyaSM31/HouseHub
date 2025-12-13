@@ -1,40 +1,59 @@
 /**
- * Message Controller - SQLite Version
+ * Message Controller (MongoDB)
+ * Handles messaging and conversations
  */
 
-const { db } = require('../config/database');
+const { Message, Conversation, User, Property } = require('../models');
 
 /**
- * Send message
+ * Send a message
  * POST /api/messages
  */
-exports.sendMessage = (req, res) => {
+exports.sendMessage = async (req, res) => {
   try {
     const senderId = req.user.userId;
-    const { receiverId, propertyId, message } = req.body;
+    const { receiverId, content, propertyId } = req.body;
 
-    // Check or create conversation
-    let conversation = db.prepare(`
-      SELECT id FROM conversations 
-      WHERE property_id = ? AND ((user1_id = ? AND user2_id = ?) OR (user1_id = ? AND user2_id = ?))
-    `).get(propertyId, senderId, receiverId, receiverId, senderId);
+    // Find or create conversation
+    let conversation = await Conversation.findOne({
+      $or: [
+        { user1_id: senderId, user2_id: receiverId },
+        { user1_id: receiverId, user2_id: senderId }
+      ]
+    });
 
     if (!conversation) {
-      const stmt = db.prepare('INSERT INTO conversations (property_id, user1_id, user2_id) VALUES (?, ?, ?)');
-      const result = stmt.run(propertyId, senderId, receiverId);
-      conversation = { id: result.lastInsertRowid };
+      conversation = await Conversation.create({
+        user1_id: senderId,
+        user2_id: receiverId,
+        property_id: propertyId || null
+      });
     }
 
-    // Insert message
-    const stmt = db.prepare('INSERT INTO messages (conversation_id, sender_id, receiver_id, message) VALUES (?, ?, ?, ?)');
-    stmt.run(conversation.id, senderId, receiverId, message);
+    // Create message
+    const message = await Message.create({
+      conversation_id: conversation._id,
+      sender_id: senderId,
+      receiver_id: receiverId,
+      content
+    });
 
-    // Update conversation timestamp
-    db.prepare('UPDATE conversations SET last_message_at = CURRENT_TIMESTAMP WHERE id = ?').run(conversation.id);
+    // Update conversation last message time
+    await Conversation.findByIdAndUpdate(conversation._id, {
+      last_message_at: new Date()
+    });
+
+    // Populate sender details
+    const populatedMessage = await Message.findById(message._id)
+      .populate('sender_id', 'display_name profile_image_url')
+      .lean();
 
     res.status(201).json({
       success: true,
-      message: 'Message sent successfully'
+      message: {
+        ...populatedMessage,
+        id: populatedMessage._id
+      }
     });
   } catch (error) {
     console.error('Send message error:', error);
@@ -43,35 +62,64 @@ exports.sendMessage = (req, res) => {
 };
 
 /**
- * Get all conversations for current user
+ * Get conversations for user
  * GET /api/messages/conversations
  */
-exports.getConversations = (req, res) => {
+exports.getConversations = async (req, res) => {
   try {
     const userId = req.user.userId;
 
-    const query = `
-      SELECT 
-        c.*,
-        CASE WHEN c.user1_id = ? THEN c.user2_id ELSE c.user1_id END as other_user_id,
-        CASE WHEN c.user1_id = ? THEN u2.display_name ELSE u1.display_name END as other_user_name,
-        CASE WHEN c.user1_id = ? THEN u2.profile_image_url ELSE u1.profile_image_url END as other_user_image,
-        p.title as property_title,
-        (SELECT message FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) as last_message,
-        (SELECT COUNT(*) FROM messages WHERE conversation_id = c.id AND receiver_id = ? AND is_read = 0) as unread_count
-      FROM conversations c
-      LEFT JOIN users u1 ON c.user1_id = u1.id
-      LEFT JOIN users u2 ON c.user2_id = u2.id
-      LEFT JOIN properties p ON c.property_id = p.id
-      WHERE c.user1_id = ? OR c.user2_id = ?
-      ORDER BY c.last_message_at DESC
-    `;
+    const conversations = await Conversation.find({
+      $or: [{ user1_id: userId }, { user2_id: userId }]
+    })
+      .populate('user1_id', 'display_name profile_image_url')
+      .populate('user2_id', 'display_name profile_image_url')
+      .populate('property_id', 'title images')
+      .sort({ last_message_at: -1 })
+      .lean();
 
-    const conversations = db.prepare(query).all(userId, userId, userId, userId, userId, userId);
+    // Get last message for each conversation
+    const conversationsWithMessages = await Promise.all(
+      conversations.map(async (conv) => {
+        const lastMessage = await Message.findOne({ conversation_id: conv._id })
+          .sort({ created_at: -1 })
+          .lean();
+
+        const otherUser = conv.user1_id._id.toString() === userId ? conv.user2_id : conv.user1_id;
+
+        // Count unread messages
+        const unreadCount = await Message.countDocuments({
+          conversation_id: conv._id,
+          receiver_id: userId,
+          is_read: false
+        });
+
+        return {
+          id: conv._id,
+          otherUser: {
+            id: otherUser._id,
+            displayName: otherUser.display_name,
+            profileImageUrl: otherUser.profile_image_url
+          },
+          property: conv.property_id ? {
+            id: conv.property_id._id,
+            title: conv.property_id.title,
+            image: conv.property_id.images[0]
+          } : null,
+          lastMessage: lastMessage ? {
+            content: lastMessage.content,
+            createdAt: lastMessage.created_at,
+            senderId: lastMessage.sender_id
+          } : null,
+          unreadCount,
+          lastMessageAt: conv.last_message_at
+        };
+      })
+    );
 
     res.json({
       success: true,
-      conversations
+      conversations: conversationsWithMessages
     });
   } catch (error) {
     console.error('Get conversations error:', error);
@@ -83,45 +131,65 @@ exports.getConversations = (req, res) => {
  * Get messages in a conversation
  * GET /api/messages/conversation/:userId
  */
-exports.getConversation = (req, res) => {
+exports.getConversationMessages = async (req, res) => {
   try {
     const currentUserId = req.user.userId;
-    const { userId: otherUserId } = req.params;
+    const otherUserId = req.params.userId;
 
-    // Get conversation
-    const conversation = db.prepare(`
-      SELECT id FROM conversations 
-      WHERE (user1_id = ? AND user2_id = ?) OR (user1_id = ? AND user2_id = ?)
-    `).get(currentUserId, otherUserId, otherUserId, currentUserId);
+    // Find conversation
+    const conversation = await Conversation.findOne({
+      $or: [
+        { user1_id: currentUserId, user2_id: otherUserId },
+        { user1_id: otherUserId, user2_id: currentUserId }
+      ]
+    }).populate('property_id', 'title images');
 
     if (!conversation) {
       return res.json({
         success: true,
-        messages: []
+        messages: [],
+        property: null
       });
     }
 
     // Get messages
-    const messages = db.prepare(`
-      SELECT m.*, 
-        u.display_name as sender_name,
-        u.profile_image_url as sender_image
-      FROM messages m
-      JOIN users u ON m.sender_id = u.id
-      WHERE m.conversation_id = ?
-      ORDER BY m.created_at ASC
-    `).all(conversation.id);
+    const messages = await Message.find({ conversation_id: conversation._id })
+      .populate('sender_id', 'display_name profile_image_url')
+      .sort({ created_at: 1 })
+      .lean();
 
     // Mark messages as read
-    db.prepare('UPDATE messages SET is_read = 1 WHERE conversation_id = ? AND receiver_id = ?').run(conversation.id, currentUserId);
+    await Message.updateMany(
+      {
+        conversation_id: conversation._id,
+        receiver_id: currentUserId,
+        is_read: false
+      },
+      { is_read: true }
+    );
+
+    const formattedMessages = messages.map(msg => ({
+      id: msg._id,
+      content: msg.content,
+      senderId: msg.sender_id._id,
+      senderName: msg.sender_id.display_name,
+      senderImage: msg.sender_id.profile_image_url,
+      createdAt: msg.created_at,
+      isRead: msg.is_read
+    }));
 
     res.json({
       success: true,
-      messages
+      messages: formattedMessages,
+      property: conversation.property_id ? {
+        id: conversation.property_id._id,
+        title: conversation.property_id.title,
+        image: conversation.property_id.images[0]
+      } : null
     });
   } catch (error) {
-    console.error('Get conversation error:', error);
-    res.status(500).json({ error: 'Failed to fetch conversation' });
+    console.error('Get messages error:', error);
+    res.status(500).json({ error: 'Failed to fetch messages' });
   }
 };
 
@@ -129,15 +197,18 @@ exports.getConversation = (req, res) => {
  * Get unread message count
  * GET /api/messages/unread
  */
-exports.getUnreadCount = (req, res) => {
+exports.getUnreadCount = async (req, res) => {
   try {
     const userId = req.user.userId;
 
-    const result = db.prepare('SELECT COUNT(*) as count FROM messages WHERE receiver_id = ? AND is_read = 0').get(userId);
+    const count = await Message.countDocuments({
+      receiver_id: userId,
+      is_read: false
+    });
 
     res.json({
       success: true,
-      count: result.count
+      count
     });
   } catch (error) {
     console.error('Get unread count error:', error);

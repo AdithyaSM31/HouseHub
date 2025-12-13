@@ -1,11 +1,11 @@
 /**
- * Authentication Controller (MongoDB)
- * Handles user registration, login, and profile management with MongoDB + JWT
+ * Authentication Controller
+ * Handles user registration, login, and profile management with SQLite + JWT
  */
 
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const { User, Bookmark } = require('../models');
+const { db } = require('../config/database');
 
 // Register new user
 exports.register = async (req, res) => {
@@ -13,26 +13,24 @@ exports.register = async (req, res) => {
     const { email, password, displayName, phoneNumber } = req.body;
 
     // Check if user already exists
-    const existingUser = await User.findOne({ email });
+    const existingUser = db.prepare('SELECT id FROM users WHERE email = ?').get(email);
 
     if (existingUser) {
       return res.status(400).json({ error: 'Email already registered' });
     }
 
     // Hash password
-    const password_hash = await bcrypt.hash(password, 10);
+    const passwordHash = await bcrypt.hash(password, 10);
 
     // Create user
-    const user = await User.create({
-      email,
-      password_hash,
-      display_name: displayName,
-      phone_number: phoneNumber || null
-    });
+    const stmt = db.prepare('INSERT INTO users (email, password_hash, display_name, phone_number) VALUES (?, ?, ?, ?)');
+    const result = stmt.run(email, passwordHash, displayName, phoneNumber || null);
+
+    const user = db.prepare('SELECT id, email, display_name, phone_number FROM users WHERE id = ?').get(result.lastInsertRowid);
 
     // Generate JWT token
     const token = jwt.sign(
-      { userId: user._id, email: user.email },
+      { userId: user.id, email: user.email },
       process.env.JWT_SECRET || 'your-secret-key',
       { expiresIn: '7d' }
     );
@@ -42,7 +40,7 @@ exports.register = async (req, res) => {
       message: 'User registered successfully',
       token,
       user: {
-        id: user._id,
+        id: user.id,
         email: user.email,
         displayName: user.display_name,
         phoneNumber: user.phone_number
@@ -60,7 +58,8 @@ exports.login = async (req, res) => {
     const { email, password } = req.body;
 
     // Find user by email
-    const user = await User.findOne({ email });
+    const user = db.prepare('SELECT id, email, password_hash, display_name, phone_number, profile_image_url FROM users WHERE email = ?').get(email);
+
 
     if (!user) {
       return res.status(401).json({ error: 'Invalid email or password' });
@@ -75,7 +74,7 @@ exports.login = async (req, res) => {
 
     // Generate JWT token
     const token = jwt.sign(
-      { userId: user._id, email: user.email },
+      { userId: user.id, email: user.email },
       process.env.JWT_SECRET || 'your-secret-key',
       { expiresIn: '7d' }
     );
@@ -85,11 +84,11 @@ exports.login = async (req, res) => {
       message: 'Login successful',
       token,
       user: {
-        id: user._id,
+        id: user.id,
         email: user.email,
         displayName: user.display_name,
         phoneNumber: user.phone_number,
-        profileImageUrl: user.profile_image_url
+        profileImage: user.profile_image_url
       }
     });
   } catch (error) {
@@ -103,26 +102,25 @@ exports.getProfile = async (req, res) => {
   try {
     const userId = req.user.userId;
 
-    // Get user details
-    const user = await User.findById(userId).select('-password_hash');
+    const user = db.prepare('SELECT id, email, display_name, phone_number, profile_image_url, created_at FROM users WHERE id = ?').get(userId);
 
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
 
     // Get bookmark count
-    const bookmarkCount = await Bookmark.countDocuments({ user_id: userId });
+    const bookmarkCount = db.prepare('SELECT COUNT(*) as count FROM bookmarks WHERE user_id = ?').get(userId);
 
     res.json({
       success: true,
       user: {
-        id: user._id,
+        id: user.id,
         email: user.email,
         displayName: user.display_name,
         phoneNumber: user.phone_number,
-        profileImageUrl: user.profile_image_url,
+        profileImage: user.profile_image_url,
         createdAt: user.created_at,
-        bookmarksCount: bookmarkCount
+        totalBookmarks: bookmarkCount.count || 0
       }
     });
   } catch (error) {
@@ -135,18 +133,12 @@ exports.getProfile = async (req, res) => {
 exports.updateProfile = async (req, res) => {
   try {
     const userId = req.user.userId;
-    const { displayName, phoneNumber, profileImageUrl } = req.body;
+    const { displayName, phoneNumber } = req.body;
 
-    // Update user
-    const user = await User.findByIdAndUpdate(
-      userId,
-      {
-        display_name: displayName,
-        phone_number: phoneNumber,
-        profile_image_url: profileImageUrl
-      },
-      { new: true, select: '-password_hash' }
-    );
+    const stmt = db.prepare('UPDATE users SET display_name = ?, phone_number = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?');
+    stmt.run(displayName, phoneNumber, userId);
+
+    const user = db.prepare('SELECT id, email, display_name, phone_number, profile_image_url FROM users WHERE id = ?').get(userId);
 
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
@@ -156,11 +148,11 @@ exports.updateProfile = async (req, res) => {
       success: true,
       message: 'Profile updated successfully',
       user: {
-        id: user._id,
+        id: user.id,
         email: user.email,
         displayName: user.display_name,
         phoneNumber: user.phone_number,
-        profileImageUrl: user.profile_image_url
+        profileImage: user.profile_image_url
       }
     });
   } catch (error) {

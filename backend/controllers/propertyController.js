@@ -1,86 +1,57 @@
 /**
- * Property Controller - SQLite Version
- * Simplified for demonstration with sample data
+ * Property Controller (MongoDB)
+ * Handles property CRUD operations
  */
 
-const { db } = require('../config/database');
+const { Property, User } = require('../models');
 
 /**
  * Get all properties with search and filters
  * GET /api/properties
  */
-exports.getAllProperties = (req, res) => {
+exports.getAllProperties = async (req, res) => {
   try {
     const { search, city, propertyType, listingType, minPrice, maxPrice, bedrooms, furnishingStatus } = req.query;
 
-    let query = `
-      SELECT p.*, 
-        GROUP_CONCAT(pi.image_url) as images,
-        p.user_id as owner_id,
-        u.display_name as owner_name,
-        u.phone_number as owner_phone
-      FROM properties p
-      LEFT JOIN property_images pi ON p.id = pi.property_id
-      LEFT JOIN users u ON p.user_id = u.id
-      WHERE p.is_active = 1
-    `;
-
-    const params = [];
+    // Build query
+    const query = { is_active: true };
 
     if (search) {
-      query += ` AND (p.title LIKE ? OR p.description LIKE ? OR p.city LIKE ?)`;
-      params.push(`%${search}%`, `%${search}%`, `%${search}%`);
+      query.$or = [
+        { title: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } },
+        { city: { $regex: search, $options: 'i' } }
+      ];
     }
 
-    if (city) {
-      query += ` AND p.city = ?`;
-      params.push(city);
-    }
+    if (city) query.city = city;
+    if (propertyType) query.property_type = propertyType;
+    if (listingType) query.listing_type = listingType;
+    if (minPrice) query.price = { ...query.price, $gte: Number(minPrice) };
+    if (maxPrice) query.price = { ...query.price, $lte: Number(maxPrice) };
+    if (bedrooms) query.bedrooms = Number(bedrooms);
+    if (furnishingStatus) query.furnishing_status = furnishingStatus;
 
-    if (propertyType) {
-      query += ` AND p.property_type = ?`;
-      params.push(propertyType);
-    }
+    const properties = await Property.find(query)
+      .populate('user_id', 'display_name phone_number email')
+      .sort({ created_at: -1 })
+      .lean();
 
-    if (listingType) {
-      query += ` AND p.listing_type = ?`;
-      params.push(listingType);
-    }
-
-    if (minPrice) {
-      query += ` AND p.price >= ?`;
-      params.push(Number(minPrice));
-    }
-
-    if (maxPrice) {
-      query += ` AND p.price <= ?`;
-      params.push(Number(maxPrice));
-    }
-
-    if (bedrooms) {
-      query += ` AND p.bedrooms = ?`;
-      params.push(Number(bedrooms));
-    }
-
-    if (furnishingStatus) {
-      query += ` AND p.furnishing_status = ?`;
-      params.push(furnishingStatus);
-    }
-
-    query += ` GROUP BY p.id ORDER BY p.created_at DESC`;
-
-    const properties = db.prepare(query).all(...params);
-
-    // Parse amenities and images
-    properties.forEach(prop => {
-      prop.amenities = prop.amenities ? JSON.parse(prop.amenities) : [];
-      prop.images = prop.images ? prop.images.split(',') : [];
-    });
+    // Format response
+    const formattedProperties = properties.map(prop => ({
+      ...prop,
+      id: prop._id,
+      owner_id: prop.user_id._id,
+      owner_name: prop.user_id.display_name,
+      owner_phone: prop.user_id.phone_number,
+      owner_email: prop.user_id.email,
+      amenities: prop.amenities ? JSON.parse(prop.amenities) : []
+    }));
 
     res.json({
       success: true,
-      count: properties.length,
-      properties
+      count: formattedProperties.length,
+      properties: formattedProperties
     });
   } catch (error) {
     console.error('Get properties error:', error);
@@ -92,32 +63,28 @@ exports.getAllProperties = (req, res) => {
  * Get featured properties
  * GET /api/properties/featured
  */
-exports.getFeaturedProperties = (req, res) => {
+exports.getFeaturedProperties = async (req, res) => {
   try {
-    const query = `
-      SELECT p.*, 
-        GROUP_CONCAT(pi.image_url) as images,
-        p.user_id as owner_id,
-        u.display_name as owner_name
-      FROM properties p
-      LEFT JOIN property_images pi ON p.id = pi.property_id
-      LEFT JOIN users u ON p.user_id = u.id
-      WHERE p.is_active = 1 AND p.is_featured = 1
-      GROUP BY p.id
-      ORDER BY p.created_at DESC
-      LIMIT 6
-    `;
+    const properties = await Property.find({ is_active: true, is_featured: true })
+      .populate('user_id', 'display_name phone_number email')
+      .sort({ created_at: -1 })
+      .limit(6)
+      .lean();
 
-    const properties = db.prepare(query).all();
-
-    properties.forEach(prop => {
-      prop.amenities = prop.amenities ? JSON.parse(prop.amenities) : [];
-      prop.images = prop.images ? prop.images.split(',') : [];
-    });
+    const formattedProperties = properties.map(prop => ({
+      ...prop,
+      id: prop._id,
+      owner_id: prop.user_id._id,
+      owner_name: prop.user_id.display_name,
+      owner_phone: prop.user_id.phone_number,
+      owner_email: prop.user_id.email,
+      amenities: prop.amenities ? JSON.parse(prop.amenities) : []
+    }));
 
     res.json({
       success: true,
-      properties
+      count: formattedProperties.length,
+      properties: formattedProperties
     });
   } catch (error) {
     console.error('Get featured properties error:', error);
@@ -126,43 +93,36 @@ exports.getFeaturedProperties = (req, res) => {
 };
 
 /**
- * Get single property by ID
+ * Get property by ID
  * GET /api/properties/:id
  */
-exports.getPropertyById = (req, res) => {
+exports.getPropertyById = async (req, res) => {
   try {
-    const { id } = req.params;
-
-    const query = `
-      SELECT p.*, 
-        GROUP_CONCAT(pi.image_url) as images,
-        p.user_id as owner_id,
-        u.display_name as owner_name,
-        u.phone_number as owner_phone,
-        u.email as owner_email,
-        u.profile_image_url as owner_image
-      FROM properties p
-      LEFT JOIN property_images pi ON p.id = pi.property_id
-      LEFT JOIN users u ON p.user_id = u.id
-      WHERE p.id = ?
-      GROUP BY p.id
-    `;
-
-    const property = db.prepare(query).get(id);
+    const property = await Property.findById(req.params.id)
+      .populate('user_id', 'display_name phone_number email profile_image_url')
+      .lean();
 
     if (!property) {
       return res.status(404).json({ error: 'Property not found' });
     }
 
-    property.amenities = property.amenities ? JSON.parse(property.amenities) : [];
-    property.images = property.images ? property.images.split(',') : [];
+    // Increment views
+    await Property.findByIdAndUpdate(req.params.id, { $inc: { views_count: 1 } });
 
-    // Increment view count
-    db.prepare('UPDATE properties SET views_count = views_count + 1 WHERE id = ?').run(id);
+    const formattedProperty = {
+      ...property,
+      id: property._id,
+      owner_id: property.user_id._id,
+      owner_name: property.user_id.display_name,
+      owner_phone: property.user_id.phone_number,
+      owner_email: property.user_id.email,
+      owner_profile_image: property.user_id.profile_image_url,
+      amenities: property.amenities ? JSON.parse(property.amenities) : []
+    };
 
     res.json({
       success: true,
-      property
+      property: formattedProperty
     });
   } catch (error) {
     console.error('Get property error:', error);
@@ -171,97 +131,36 @@ exports.getPropertyById = (req, res) => {
 };
 
 /**
- * Get properties by user (current user's listings)
- * GET /api/properties/user/me
- */
-exports.getUserProperties = (req, res) => {
-  try {
-    const userId = req.user.userId;
-
-    const query = `
-      SELECT p.*, 
-        GROUP_CONCAT(pi.image_url) as images
-      FROM properties p
-      LEFT JOIN property_images pi ON p.id = pi.property_id
-      WHERE p.user_id = ?
-      GROUP BY p.id
-      ORDER BY p.created_at DESC
-    `;
-
-    const properties = db.prepare(query).all(userId);
-
-    properties.forEach(prop => {
-      prop.amenities = prop.amenities ? JSON.parse(prop.amenities) : [];
-      prop.images = prop.images ? prop.images.split(',') : [];
-    });
-
-    res.json({
-      success: true,
-      properties
-    });
-  } catch (error) {
-    console.error('Get user properties error:', error);
-    res.status(500).json({ error: 'Failed to fetch user properties' });
-  }
-};
-
-/**
  * Create new property
  * POST /api/properties
  */
-exports.createProperty = (req, res) => {
+exports.createProperty = async (req, res) => {
   try {
     const userId = req.user.userId;
-    const {
-      title, description, propertyType, listingType, price,
-      address, city, state, pincode,
-      bedrooms, bathrooms, areaSqft, furnishingStatus,
-      amenities, images
-    } = req.body;
+    const propertyData = req.body;
 
-    // Insert property
-    const stmt = db.prepare(`
-      INSERT INTO properties 
-      (user_id, title, description, property_type, listing_type, price,
-       address, city, state, pincode, bedrooms, bathrooms, area_sqft, 
-       furnishing_status, amenities, is_active)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
-    `);
-
-    const result = stmt.run(
-      userId, title, description, propertyType, listingType, price,
-      address, city, state, pincode,
-      bedrooms || null, bathrooms || null, areaSqft || null,
-      furnishingStatus || null,
-      amenities ? JSON.stringify(amenities) : null
-    );
-
-    const propertyId = result.lastInsertRowid;
-
-    // Insert images if provided
-    if (images && Array.isArray(images)) {
-      const imgStmt = db.prepare('INSERT INTO property_images (property_id, image_url, is_primary, display_order) VALUES (?, ?, ?, ?)');
-      images.forEach((img, i) => {
-        imgStmt.run(propertyId, img, i === 0 ? 1 : 0, i);
-      });
+    // Convert amenities array to JSON string
+    if (Array.isArray(propertyData.amenities)) {
+      propertyData.amenities = JSON.stringify(propertyData.amenities);
     }
 
-    // Get created property
-    const property = db.prepare(`
-      SELECT p.*, GROUP_CONCAT(pi.image_url) as images
-      FROM properties p
-      LEFT JOIN property_images pi ON p.id = pi.property_id
-      WHERE p.id = ?
-      GROUP BY p.id
-    `).get(propertyId);
+    const property = await Property.create({
+      user_id: userId,
+      ...propertyData
+    });
 
-    property.amenities = property.amenities ? JSON.parse(property.amenities) : [];
-    property.images = property.images ? property.images.split(',') : [];
+    const populatedProperty = await Property.findById(property._id)
+      .populate('user_id', 'display_name phone_number email')
+      .lean();
 
     res.status(201).json({
       success: true,
       message: 'Property created successfully',
-      property
+      property: {
+        ...populatedProperty,
+        id: populatedProperty._id,
+        amenities: populatedProperty.amenities ? JSON.parse(populatedProperty.amenities) : []
+      }
     });
   } catch (error) {
     console.error('Create property error:', error);
@@ -273,62 +172,41 @@ exports.createProperty = (req, res) => {
  * Update property
  * PUT /api/properties/:id
  */
-exports.updateProperty = (req, res) => {
+exports.updateProperty = async (req, res) => {
   try {
-    const { id } = req.params;
     const userId = req.user.userId;
-    const {
-      title, description, propertyType, listingType, price,
-      address, city, state, pincode,
-      bedrooms, bathrooms, areaSqft, furnishingStatus,
-      amenities
-    } = req.body;
+    const propertyId = req.params.id;
 
-    // Check ownership
-    const property = db.prepare('SELECT user_id FROM properties WHERE id = ?').get(id);
-    
+    // Check if property belongs to user
+    const property = await Property.findById(propertyId);
+
     if (!property) {
       return res.status(404).json({ error: 'Property not found' });
     }
 
-    if (property.user_id !== userId) {
-      return res.status(403).json({ error: 'Not authorized to update this property' });
+    if (property.user_id.toString() !== userId) {
+      return res.status(403).json({ error: 'Unauthorized to update this property' });
     }
 
-    // Update property
-    const stmt = db.prepare(`
-      UPDATE properties SET
-        title = ?, description = ?, property_type = ?, listing_type = ?, price = ?,
-        address = ?, city = ?, state = ?, pincode = ?,
-        bedrooms = ?, bathrooms = ?, area_sqft = ?, furnishing_status = ?,
-        amenities = ?, updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `);
+    // Convert amenities array to JSON string
+    if (Array.isArray(req.body.amenities)) {
+      req.body.amenities = JSON.stringify(req.body.amenities);
+    }
 
-    stmt.run(
-      title, description, propertyType, listingType, price,
-      address, city, state, pincode,
-      bedrooms || null, bathrooms || null, areaSqft || null, furnishingStatus || null,
-      amenities ? JSON.stringify(amenities) : null,
-      id
-    );
-
-    // Get updated property
-    const updated = db.prepare(`
-      SELECT p.*, GROUP_CONCAT(pi.image_url) as images
-      FROM properties p
-      LEFT JOIN property_images pi ON p.id = pi.property_id
-      WHERE p.id = ?
-      GROUP BY p.id
-    `).get(id);
-
-    updated.amenities = updated.amenities ? JSON.parse(updated.amenities) : [];
-    updated.images = updated.images ? updated.images.split(',') : [];
+    const updatedProperty = await Property.findByIdAndUpdate(
+      propertyId,
+      { ...req.body, updated_at: Date.now() },
+      { new: true }
+    ).populate('user_id', 'display_name phone_number email').lean();
 
     res.json({
       success: true,
       message: 'Property updated successfully',
-      property: updated
+      property: {
+        ...updatedProperty,
+        id: updatedProperty._id,
+        amenities: updatedProperty.amenities ? JSON.parse(updatedProperty.amenities) : []
+      }
     });
   } catch (error) {
     console.error('Update property error:', error);
@@ -340,24 +218,23 @@ exports.updateProperty = (req, res) => {
  * Delete property
  * DELETE /api/properties/:id
  */
-exports.deleteProperty = (req, res) => {
+exports.deleteProperty = async (req, res) => {
   try {
-    const { id } = req.params;
     const userId = req.user.userId;
+    const propertyId = req.params.id;
 
-    // Check ownership
-    const property = db.prepare('SELECT user_id FROM properties WHERE id = ?').get(id);
-    
+    // Check if property belongs to user
+    const property = await Property.findById(propertyId);
+
     if (!property) {
       return res.status(404).json({ error: 'Property not found' });
     }
 
-    if (property.user_id !== userId) {
-      return res.status(403).json({ error: 'Not authorized to delete this property' });
+    if (property.user_id.toString() !== userId) {
+      return res.status(403).json({ error: 'Unauthorized to delete this property' });
     }
 
-    // Delete property (images will be deleted via CASCADE)
-    db.prepare('DELETE FROM properties WHERE id = ?').run(id);
+    await Property.findByIdAndDelete(propertyId);
 
     res.json({
       success: true,
@@ -366,5 +243,34 @@ exports.deleteProperty = (req, res) => {
   } catch (error) {
     console.error('Delete property error:', error);
     res.status(500).json({ error: 'Failed to delete property' });
+  }
+};
+
+/**
+ * Get user's properties
+ * GET /api/properties/user/my-listings
+ */
+exports.getUserProperties = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+
+    const properties = await Property.find({ user_id: userId })
+      .sort({ created_at: -1 })
+      .lean();
+
+    const formattedProperties = properties.map(prop => ({
+      ...prop,
+      id: prop._id,
+      amenities: prop.amenities ? JSON.parse(prop.amenities) : []
+    }));
+
+    res.json({
+      success: true,
+      count: formattedProperties.length,
+      properties: formattedProperties
+    });
+  } catch (error) {
+    console.error('Get user properties error:', error);
+    res.status(500).json({ error: 'Failed to fetch user properties' });
   }
 };

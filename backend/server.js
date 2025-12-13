@@ -10,7 +10,7 @@ const socketIO = require('socket.io');
 require('dotenv').config();
 
 // Import configurations
-const { testConnection } = require('./config/database');
+const { connectDB, testConnection } = require('./config/database_mongodb');
 
 // Import middleware
 const errorHandler = require('./middleware/errorHandler');
@@ -139,7 +139,8 @@ io.on('connection', (socket) => {
 // Initialize server
 const startServer = async () => {
   try {
-    // Test database connection
+    // Connect to MongoDB
+    await connectDB();
     await testConnection();
 
     // Start server

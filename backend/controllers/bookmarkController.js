@@ -1,38 +1,43 @@
 /**
- * Bookmark Controller - SQLite Version
+ * Bookmark Controller (MongoDB)
+ * Handles bookmark toggle and retrieval
  */
 
-const { db } = require('../config/database');
+const { Bookmark, Property } = require('../models');
 
 /**
- * Toggle bookmark (add/remove)
+ * Toggle bookmark for a property
  * POST /api/bookmarks/:propertyId
  */
-exports.toggleBookmark = (req, res) => {
+exports.toggleBookmark = async (req, res) => {
   try {
     const userId = req.user.userId;
-    const { propertyId } = req.params;
+    const propertyId = req.params.propertyId;
 
     // Check if bookmark exists
-    const existing = db.prepare('SELECT id FROM bookmarks WHERE user_id = ? AND property_id = ?').get(userId, propertyId);
+    const existingBookmark = await Bookmark.findOne({
+      user_id: userId,
+      property_id: propertyId
+    });
 
-    if (existing) {
+    if (existingBookmark) {
       // Remove bookmark
-      db.prepare('DELETE FROM bookmarks WHERE user_id = ? AND property_id = ?').run(userId, propertyId);
-      
-      res.json({
+      await Bookmark.findByIdAndDelete(existingBookmark._id);
+      return res.json({
         success: true,
-        message: 'Bookmark removed',
-        bookmarked: false
+        bookmarked: false,
+        message: 'Bookmark removed'
       });
     } else {
       // Add bookmark
-      db.prepare('INSERT INTO bookmarks (user_id, property_id) VALUES (?, ?)').run(userId, propertyId);
-      
-      res.json({
+      await Bookmark.create({
+        user_id: userId,
+        property_id: propertyId
+      });
+      return res.json({
         success: true,
-        message: 'Bookmark added',
-        bookmarked: true
+        bookmarked: true,
+        message: 'Property bookmarked'
       });
     }
   } catch (error) {
@@ -42,36 +47,44 @@ exports.toggleBookmark = (req, res) => {
 };
 
 /**
- * Get all bookmarked properties for current user
+ * Get user's bookmarked properties
  * GET /api/bookmarks
  */
-exports.getBookmarks = (req, res) => {
+exports.getUserBookmarks = async (req, res) => {
   try {
     const userId = req.user.userId;
 
-    const query = `
-      SELECT p.*, 
-        GROUP_CONCAT(pi.image_url) as images,
-        u.display_name as owner_name,
-        b.created_at as bookmarked_at
-      FROM bookmarks b
-      JOIN properties p ON b.property_id = p.id
-      LEFT JOIN property_images pi ON p.id = pi.property_id
-      LEFT JOIN users u ON p.user_id = u.id
-      WHERE b.user_id = ?
-      GROUP BY p.id
-      ORDER BY b.created_at DESC
-    `;
+    const bookmarks = await Bookmark.find({ user_id: userId })
+      .populate({
+        path: 'property_id',
+        populate: {
+          path: 'user_id',
+          select: 'display_name phone_number email'
+        }
+      })
+      .sort({ created_at: -1 })
+      .lean();
 
-    const properties = db.prepare(query).all(userId);
-
-    properties.forEach(prop => {
-      prop.amenities = prop.amenities ? JSON.parse(prop.amenities) : [];
-      prop.images = prop.images ? prop.images.split(',') : [];
-    });
+    // Format properties
+    const properties = bookmarks
+      .filter(b => b.property_id) // Filter out null properties
+      .map(bookmark => {
+        const prop = bookmark.property_id;
+        return {
+          ...prop,
+          id: prop._id,
+          owner_id: prop.user_id._id,
+          owner_name: prop.user_id.display_name,
+          owner_phone: prop.user_id.phone_number,
+          owner_email: prop.user_id.email,
+          amenities: prop.amenities ? JSON.parse(prop.amenities) : [],
+          bookmarked_at: bookmark.created_at
+        };
+      });
 
     res.json({
       success: true,
+      count: properties.length,
       properties
     });
   } catch (error) {
@@ -84,12 +97,15 @@ exports.getBookmarks = (req, res) => {
  * Check if property is bookmarked
  * GET /api/bookmarks/check/:propertyId
  */
-exports.checkBookmark = (req, res) => {
+exports.checkBookmark = async (req, res) => {
   try {
     const userId = req.user.userId;
-    const { propertyId } = req.params;
+    const propertyId = req.params.propertyId;
 
-    const bookmark = db.prepare('SELECT id FROM bookmarks WHERE user_id = ? AND property_id = ?').get(userId, propertyId);
+    const bookmark = await Bookmark.findOne({
+      user_id: userId,
+      property_id: propertyId
+    });
 
     res.json({
       success: true,
